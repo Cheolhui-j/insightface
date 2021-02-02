@@ -1,6 +1,6 @@
 from pathlib import Path
 from config import get_config
-from data.data_pipe import load_bin, load_mx_rec
+from data_pipe import load_bin, load_mx_rec
 import argparse
 
 if __name__ == '__main__':
