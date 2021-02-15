@@ -11,9 +11,6 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '6'
 Hist_size = 10001
 image_list_size = 13233
 
-def cos_sim(A, B):
-       return np.dot(A, B)/(np.linalg.norm(A)*np.linalg.norm(B))
-
 def checkissame(src, dst):
 
     name1 = '_'.join(src.split('_')[:-1])
@@ -87,7 +84,6 @@ def all_pair_lfw(learner_path, list_path, out_text):
             dist = (embedding1 - embedding2).norm(p=2)
             dist = dist.cpu().detach().numpy()
             dist = 1.0 - (float(dist)/2)
-            #dist = cos_sim(embedding1, embedding2)
 
             sim_bin = min(dist * Hist_size - 1, Hist_size - 1)
 

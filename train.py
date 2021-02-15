@@ -3,8 +3,6 @@ from Learner import face_learner
 import os
 import argparse
 
-# python train.py -net mobilefacenet -b 200 -w 4
-
 os.environ['CUDA_VISIBLE_DEVICES'] = '5'
 
 if __name__ == '__main__':
@@ -19,14 +17,7 @@ if __name__ == '__main__':
     # args = parser.parse_args()
 
     conf = get_config()
-    
-    if conf.net_mode == 'mobilefacenet':
-        conf.use_mobilfacenet = True
       
-    # conf.lr = args.lr
-    # conf.batch_size = args.batch_size
-    # conf.num_workers = args.num_workers
-    # conf.data_mode = args.data_mode
     learner = face_learner(conf)
 
     learner.train(conf, conf.epochs)
