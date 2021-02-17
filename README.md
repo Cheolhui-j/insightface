@@ -67,7 +67,8 @@ The following picture is based on [arcface](https://arxiv.org/pdf/1801.07698.pdf
   ```
   python dataset_merge/dataset_merge.py
   
-  usage: dataset_merge/dataset_merge.py [--r REC_DATA_PATH]
+  usage: dataset_merge/dataset_merge.py [--merge MERGE_DATA_PATHS] [--output OUTPUT_PATH] [--model MODEL_PATH] \
+                                        [--batch-size BATCH_SIZE] [--t TRESHOLD]
 
   optional arguments:
         --merge MERGE_DATA_PATHS Path where rec data files are stored  
