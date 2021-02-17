@@ -1,7 +1,6 @@
 from data.data_pipe import de_preprocess, get_train_loader, get_val_data
 
 from model.model_ir import IRNet
-from model.model_mobilefacenet import MobileFaceNet
 from model.model_resnet import ResNet_18, ResNet_34, ResNet_50, ResNet_101, ResNet_152
 from model.model_lightCNN import LightCNN_9Layers, LightCNN_29Layers, LightCNN_29Layers_v2
 from model.arcface import Arcface, Am_softmax, l2_norm
@@ -14,32 +13,19 @@ from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from matplotlib import pyplot as plt
 plt.switch_backend('agg')
-from utils import get_time, gen_plot, hflip_batch, separate_bn_paras,\
-    setup_logger, make_dir, print_network, CosineAnnealingWarmUpRestarts
+from utils import gen_plot, hflip_batch, separate_bn_paras,\
+     make_dir #, CosineAnnealingWarmUpRestarts
 from PIL import Image
 from torchvision import transforms as trans
-import math
-import bcolz
-import logging
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
 class face_learner(object):
-    def __init__(self, conf, inference=False):
+    def __init__(self, conf, train=True):
         make_dir(conf.work_path)        
         make_dir(conf.model_path)
         make_dir(conf.log_path)
-        make_dir(conf.save_path)
-
-        setup_logger('configs', conf.work_path, 'configs', level=logging.INFO, screen=True)
-        self.logger_configs = logging.getLogger('configs')
-        
-        setup_logger('trainloss', conf.work_path, 'trainloss', level=logging.INFO, screen=True)
-        self.logger_trainloss = logging.getLogger('trainloss')
-        
-        setup_logger('valid', conf.work_path, 'valid', level=logging.INFO, screen=True)
-        self.logger_valid = logging.getLogger('valid')
 
         if conf.gpu_ids:
             assert torch.cuda.is_available(), 'GPU is not avalialble!'
@@ -49,10 +35,6 @@ class face_learner(object):
             conf.device = torch.device('cpu')
         
         self.gpu_ids = conf.gpu_ids
-   
-        for k, v in conf.items():
-            log = '\t{} : {}'.format(k, v)
-            self.logger_configs.info(log)
 
         self.model = None
         self.net_type = '{}_{}'.format(conf.net_mode, conf.net_depth)
@@ -87,45 +69,40 @@ class face_learner(object):
 
         assert self.model is not None, "Model is NONE!!"
 
+        if train:
+            self.milestones = conf.milestones
+            self.loader, self.class_num = get_train_loader(conf)
 
-        sturct_log1, sturct_log2 = print_network(self.model)
-        self.logger_configs.info('Model Architecture')
-        self.logger_configs.info(sturct_log1) 
-        self.logger_configs.info(sturct_log2)        
+            self.writer = SummaryWriter(conf.log_path)
+            self.step = 0
+            self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
 
-        self.milestones = conf.milestones
-        self.loader, self.class_num = get_train_loader(conf)        
+            print('two model heads generated')
 
-        self.writer = SummaryWriter(conf.log_path)
-        self.step = 0
-        self.head = Arcface(embedding_size=conf.embedding_size, classnum=self.class_num).to(conf.device)
+            paras_only_bn, paras_wo_bn = separate_bn_paras(self.model)
 
-        print('two model heads generated')
+            if conf.use_ADAM:
+                self.optimizer = optim.Adam([
+                                    {'params': paras_wo_bn + [self.head.kernel], 'weight_decay': 5e-4},
+                                    {'params': paras_only_bn}
+                                ], lr = conf.lr, betas=(0.9, 0.999))
+            else:
+                self.optimizer = optim.SGD([
+                                    {'params': paras_wo_bn + [self.head.kernel], 'weight_decay': 5e-4},
+                                    {'params': paras_only_bn}
+                                ], lr = conf.lr, momentum = conf.momentum)
+            print(self.optimizer)
 
-        paras_only_bn, paras_wo_bn = separate_bn_paras(self.model)
 
-        if conf.use_ADAM:
-            self.optimizer = optim.Adam([
-                                {'params': paras_wo_bn + [self.head.kernel], 'weight_decay': 5e-4},
-                                {'params': paras_only_bn}
-                            ], lr = conf.lr, betas=(0.9, 0.999))
-        else:
-            self.optimizer = optim.SGD([
-                                {'params': paras_wo_bn + [self.head.kernel], 'weight_decay': 5e-4},
-                                {'params': paras_only_bn}
-                            ], lr = conf.lr, momentum = conf.momentum)
-        print(self.optimizer)
-        
+            # if conf.cosine_lr == True:
+            #     self.scheduler = CosineAnnealingWarmUpRestarts(self.optimizer, patience=40, verbose=True)
 
-        if conf.cosine_lr == True:
-            self.scheduler = CosineAnnealingWarmUpRestarts(self.optimizer, patience=40, verbose=True)
+            print('optimizers generated')
+            self.board_loss_every = len(self.loader)//100
+            self.evaluate_every = len(self.loader)//10
+            self.save_every = len(self.loader)//5
+            self.agedb_30, self.cfp_fp, self.lfw, self.agedb_30_issame, self.cfp_fp_issame, self.lfw_issame = get_val_data(conf.data_folder)
 
-        print('optimizers generated')    
-        self.board_loss_every = len(self.loader)//100
-        self.evaluate_every = len(self.loader)//10
-        self.save_every = len(self.loader)//5
-        self.agedb_30, self.cfp_fp, self.lfw, self.agedb_30_issame, self.cfp_fp_issame, self.lfw_issame = get_val_data(conf.emore_folder)
-    
     def save_state(self, conf, accuracy, extra=None, model_only=False):
 
         save_path = conf.model_path
@@ -174,10 +151,8 @@ class face_learner(object):
 
             
     def load_state(self, conf, fixed_str, from_save_folder=False, model_only=False):
-        if from_save_folder:
-            save_path = conf.save_path
-        else:
-            save_path = conf.model_path            
+
+        save_path = conf.model_path
         self.model.load_state_dict(torch.load(save_path+'/'+'model_{}'.format(fixed_str)))
         if not model_only:
             self.head.load_state_dict(torch.load(save_path+'/'+'head_{}'.format(fixed_str)))
@@ -190,9 +165,6 @@ class face_learner(object):
         self.writer.add_scalar('{}_FRR'.format(db_name), frr, self.step)
         self.writer.add_scalar('{}_EER'.format(db_name), eer, self.step)
         self.writer.add_image('{}_roc_curve'.format(db_name), roc_curve_tensor, self.step)
-        log = '[Training Step : {}] [DB: {}] Accuracy: {:.4f} Best Threshold: {:.4f} FAR: {:.4f} FRR: {:.4f} EER: {:.4f}'.format(
-            self.step, db_name, accuracy, best_threshold, far, frr, eer)
-        self.logger_valid.info(log)
         
     def evaluate(self, conf, carray, issame, nrof_folds = 5, tta = False):
         self.model.eval()
@@ -269,16 +241,12 @@ class face_learner(object):
                     print('GPU IDS: {}'.format(self.gpu_ids))
                     print('Training Model: {}'.format(self.net_type))                    
                     loss_board = running_loss / self.board_loss_every
-                    log = '[Epoch:{}|{}] [Step:{}] Training Loss : {:.4f}\n'.format(e, epochs, self.step, loss_board)
-                    self.logger_trainloss.info(log)                    
                     self.writer.add_scalar('train_loss', loss_board, self.step)
                     running_loss = 0.
                 
                 if self.step % self.evaluate_every == 0 and self.step != 0:
                     print('GPU IDS: {}'.format(self.gpu_ids))
                     print('Training Model: {}'.format(self.net_type))
-                    log = '\n\n[Epoch:{}|{}]'.format(e, epochs)
-                    self.logger_valid.info(log)
                     accuracy_agedb30, best_threshold_agedb30, roc_curve_tensor_agedb30, far_agedb30, frr_agedb30, eer_agedb30 = self.evaluate(conf, self.agedb_30, self.agedb_30_issame)
                     self.board_val('agedb_30', accuracy_agedb30, best_threshold_agedb30, roc_curve_tensor_agedb30, far_agedb30, frr_agedb30, eer_agedb30)
                     accuracy_lfw, best_threshold_lfw, roc_curve_tensor_lfw, far_lfw, frr_lfw, eer_lfw = self.evaluate(conf, self.lfw, self.lfw_issame)
@@ -293,4 +261,4 @@ class face_learner(object):
                     
                 self.step += 1
                 
-        self.save_state(conf, accuracy, to_save_folder=True, extra='epoch_{}'.format(e))
+        self.save_state(conf, accuracy, extra='epoch_{}'.format(e))

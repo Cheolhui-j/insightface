@@ -3,7 +3,7 @@ from Learner import face_learner
 import os
 import argparse
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 if __name__ == '__main__':
     # parser = argparse.ArgumentParser(description='for face verification')

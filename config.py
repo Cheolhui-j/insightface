@@ -12,21 +12,18 @@ def get_config(training = True):
     # PATH
     #===============================================================================
     # Data Path
-    conf.data_path = '/mnt/cheolhui/Training_2/data'
-    conf.data_mode = 'emore'
-    conf.vgg_folder = os.path.join(conf.data_path, 'faces_vgg_112x112')
-    conf.ms1m_folder = os.path.join(conf.data_path, 'faces_ms1m_112x112')
-    conf.emore_folder = os.path.join(conf.data_path, 'faces_emore')
+    conf.data_path = './dataset'
+    conf.data_folder = os.path.join(conf.data_path, 'faces_umd')
 
     # Save Path
-    conf.work_path = '/mnt/cheolhui/all_pair/work_space/mv' 
+    conf.work_path = './work_space'
     conf.model_path = os.path.join(conf.work_path, 'models')
     conf.log_path = os.path.join(conf.work_path, 'logs')
 
     #===============================================================================
     # Training Env
     #===============================================================================
-    conf.gpu_ids = [6]
+    conf.gpu_ids = [0]
     conf.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -43,13 +40,12 @@ def get_config(training = True):
     #conf.net_depth = 101
     conf.use_ADAM = True
     
-    conf.batch_size = 512 # irse net depth 50
+    conf.batch_size = 256 # irse net depth 50
 
     conf.epochs = 2000
     
     conf.input_size = [112,112]
     conf.embedding_size = 512
-    conf.use_mobilfacenet = False
     
     conf.drop_ratio = 0.6
     

@@ -182,9 +182,9 @@ def evaluate(embeddings, actual_issame, nrof_folds=10, pca=0):
                                        np.asarray(actual_issame), nrof_folds=nrof_folds, pca=pca)
     thresholds = np.arange(0, 4, 0.001)
     val, val_std, far, frr, eer = calculate_val(thresholds, embeddings1, embeddings2,
-                                      np.asarray(actual_issame), 1e-3, nrof_folds=nrof_folds)
+                                      np.asarray(actual_issame), 1e-2, nrof_folds=nrof_folds)
 
     best_val, best_val_std, best_far, best_frr, best_eer = calculate_val(best_thresholds, embeddings1, embeddings2,
-                                                np.asarray(actual_issame), 1e-3, nrof_folds=nrof_folds)
+                                                np.asarray(actual_issame), 1e-2, nrof_folds=nrof_folds)
 
     return tpr, fpr, accuracy, best_thresholds, val, val_std, far, frr, eer
