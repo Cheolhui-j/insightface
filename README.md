@@ -82,7 +82,7 @@ The following picture is based on [arcface](https://arxiv.org/pdf/1801.07698.pdf
 
 # To Do
 + modify code 
-+ add image
++ add efficientnet architecture
 
 # Reference
 Jiankang Deng and Jia Guo and Stefanos Zafeiriou(2018), ArcFace: Additive Angular Margin Loss for Deep Face Recognition
